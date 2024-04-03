@@ -310,6 +310,9 @@ int main(void)
 
 	gpio_init(LED_PIN);
 	gpio_set_dir(LED_PIN, GPIO_OUT);
+	gpio_put(LED_PIN, 1);
+	sleep_ms(1000);
+	gpio_put(LED_PIN, 0);
 
 	multicore_launch_core1(core1_entry);
 
