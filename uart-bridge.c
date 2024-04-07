@@ -6,8 +6,10 @@
 #include <hardware/irq.h>
 #include <hardware/structs/sio.h>
 #include <hardware/uart.h>
+#include <hardware/watchdog.h>
 #include <pico/multicore.h>
 #include <pico/stdlib.h>
+#include <pico/bootrom.h>
 #include <string.h>
 #include <tusb.h>
 
@@ -23,6 +25,9 @@
 #define DEF_STOP_BITS 1
 #define DEF_PARITY 0
 #define DEF_DATA_BITS 8
+
+#define BOOTSEL_BIT_RATE	1200
+#define WD_RESET_BIT_RATE	2400
 
 typedef struct {
 	uart_inst_t *const inst;
@@ -171,9 +176,20 @@ void usb_write_bytes(uint8_t itf)
 void usb_cdc_process(uint8_t itf)
 {
 	uart_data_t *ud = &UART_DATA[itf];
+	uart_inst_t *uart = uart_get_instance(itf);
 
 	mutex_enter_blocking(&ud->lc_mtx);
 	tud_cdc_n_get_line_coding(itf, &ud->usb_lc);
+	uart_init(uart, ud->usb_lc.bit_rate);
+	uart_set_hw_flow(uart, false, false);
+	// Reset to BOOTSEL
+	if (ud->usb_lc.bit_rate == BOOTSEL_BIT_RATE) {
+		reset_usb_boot(0, 0);
+	}
+	// Soft reboot via watchdog
+	if (ud->usb_lc.bit_rate == WD_RESET_BIT_RATE) {
+		watchdog_reboot(0, 0, 0);
+	}
 	mutex_exit(&ud->lc_mtx);
 
 	usb_read_bytes(itf);
